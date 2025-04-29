@@ -1,10 +1,14 @@
 import asyncio
 import random
+import os
 from telethon import TelegramClient, events
+from telethon.errors import AuthKeyUnregisteredError
 from auth import api_id, api_hash, phone_number
 from config import source_chat_ids, target_chat_ids, delay_range
 
-client = TelegramClient('session', api_id, api_hash)
+SESSION_NAME = "session"
+
+client = TelegramClient(SESSION_NAME, api_id, api_hash)
 
 
 async def list_chats():
@@ -37,7 +41,7 @@ async def list_chats():
 async def forward_messages():
     await client.start(phone_number)
 
-    # Преобразуем ID получателей в InputPeer-объекты
+    # Преобразуем ID целевых чатов в сущности
     target_peers = []
     for chat_id in target_chat_ids:
         try:
@@ -47,13 +51,12 @@ async def forward_messages():
             print(f"❌ Не удалось получить entity для {chat_id}: {e}")
 
     if not target_peers:
-        print("❌ Нет доступных целевых чатов для пересылки. Завершение.")
+        print("⚠️ Нет доступных целевых чатов для пересылки. Завершение.")
         return
 
     @client.on(events.NewMessage(chats=source_chat_ids))
     async def handler(event):
         message = event.message
-
         for peer in target_peers:
             try:
                 await asyncio.sleep(random.uniform(*delay_range))
@@ -72,13 +75,21 @@ def main():
     print("2. Сохранить список всех чатов в chat_list.txt и выйти")
     choice = input("Введите 1 или 2: ").strip()
 
-    with client:
-        if choice == '1':
-            client.loop.run_until_complete(forward_messages())
-        elif choice == '2':
-            client.loop.run_until_complete(list_chats())
-        else:
-            print("❌ Неверный выбор. Завершение работы.")
+    try:
+        with client:
+            if choice == '1':
+                client.loop.run_until_complete(forward_messages())
+            elif choice == '2':
+                client.loop.run_until_complete(list_chats())
+            else:
+                print("❌ Неверный выбор. Завершение работы.")
+    except AuthKeyUnregisteredError:
+        print("❌ Сессия Telegram недействительна. Удаление старой сессии...")
+        try:
+            os.remove(f"{SESSION_NAME}.session")
+            print("🔁 Повторите запуск скрипта — будет запрошен код подтверждения.")
+        except Exception as e:
+            print(f"❌ Не удалось удалить сессию: {e}")
 
 
 if __name__ == '__main__':
