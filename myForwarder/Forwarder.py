@@ -37,17 +37,30 @@ async def list_chats():
 async def forward_messages():
     await client.start(phone_number)
 
+    # Преобразуем ID получателей в InputPeer-объекты
+    target_peers = []
+    for chat_id in target_chat_ids:
+        try:
+            peer = await client.get_entity(chat_id)
+            target_peers.append(peer)
+        except Exception as e:
+            print(f"❌ Не удалось получить entity для {chat_id}: {e}")
+
+    if not target_peers:
+        print("❌ Нет доступных целевых чатов для пересылки. Завершение.")
+        return
+
     @client.on(events.NewMessage(chats=source_chat_ids))
     async def handler(event):
         message = event.message
 
-        for chat_id in target_chat_ids:
+        for peer in target_peers:
             try:
                 await asyncio.sleep(random.uniform(*delay_range))
-                await client.send_message(chat_id, message)
-                print(f"✅ Сообщение переслано в {chat_id}")
+                await client.send_message(peer, message)
+                print(f"✅ Сообщение переслано в {peer.id}")
             except Exception as e:
-                print(f"❌ Не удалось переслать в {chat_id}: {e}")
+                print(f"❌ Не удалось переслать в {peer.id}: {e}")
 
     print("📡 Скрипт запущен. Ожидаю сообщения...")
     await client.run_until_disconnected()
