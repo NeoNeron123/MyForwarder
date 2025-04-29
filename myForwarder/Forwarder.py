@@ -8,7 +8,37 @@ from config import source_chat_ids, target_chat_ids, delay_range
 
 SESSION_NAME = "session"
 
-client = TelegramClient(SESSION_NAME, api_id, api_hash)
+# Прокси список: (proxy_type, address, port, [secret])
+proxy_list = [
+    ('none',),  # Без прокси
+    ('socks5', '127.0.0.1', 1080),
+    ('socks5', 'proxy.example.com', 1080, 'user', 'pass'),  # с авторизацией
+    ('mtproto', 'proxy.mtproto.com', 443, 'abcdef1234567890abcdef1234567890'),
+]
+
+# Функция выбора прокси
+def choose_proxy():
+    print("Выберите прокси:")
+    for i, proxy in enumerate(proxy_list):
+        name = proxy[0].upper() if proxy[0] != 'none' else 'Без прокси'
+        print(f"{i + 1}. {name} — {proxy[1:] if len(proxy) > 1 else ''}")
+
+    try:
+        choice = int(input("Введите номер прокси: ").strip()) - 1
+        selected = proxy_list[choice]
+
+        if selected[0] == 'none':
+            return None
+        elif selected[0] == 'socks5':
+            if len(selected) == 5:
+                return ('socks5', selected[1], selected[2], True, selected[3], selected[4])
+            else:
+                return ('socks5', selected[1], selected[2])
+        elif selected[0] == 'mtproto':
+            return ('mtproxy', selected[1], selected[2], selected[3])
+    except Exception as e:
+        print(f"❌ Неверный выбор: {e}")
+        return None
 
 
 async def list_chats():
@@ -41,7 +71,6 @@ async def list_chats():
 async def forward_messages():
     await client.start(phone_number)
 
-    # Преобразуем ID целевых чатов в сущности
     target_peers = []
     for chat_id in target_chat_ids:
         try:
@@ -70,7 +99,12 @@ async def forward_messages():
 
 
 def main():
-    print("Выберите действие:")
+    proxy = choose_proxy()
+
+    global client
+    client = TelegramClient(SESSION_NAME, api_id, api_hash, proxy=proxy)
+
+    print("\nВыберите действие:")
     print("1. Запустить пересылку сообщений")
     print("2. Сохранить список всех чатов в chat_list.txt и выйти")
     choice = input("Введите 1 или 2: ").strip()
